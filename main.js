@@ -2,6 +2,8 @@
 
 $(function() {
     const video = $("video")[0];
+    const seen = new Set()
+    var counter = 0
 
     var model;
 
@@ -106,53 +108,63 @@ $(function() {
     };
 
     const renderPredictions = function(predictions) {
+
+        // changes:
+        // 1. treat preditions like a stack, pop out one prediction and work with that if conf is right (load class into seen)
+        // 2. add popped prediction.class to lookup set that clears via timeout every few sec
+        // 3. add counter which track individual detection each time it comes out
+        // 4. increase the random seed range
+        
         var dimensions = videoDimensions(video);
-
+        
         var scale = 1;
-
+        
         // added some random box alterations to make objects harder to localize
-        const xRand = randomIntFromInterval(40, 60)
-        const yRand = randomIntFromInterval(40, 60)
-
+        const low = 70, hi = 100
+        const xRand = randomIntFromInterval(low, hi)
+        const yRand = randomIntFromInterval(low, hi)
+        
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        
+        let flag = false, prediction = null
+        
+        while(!flag && predictions.length > 1) {
+            prediction = predictions.pop()
+            if(prediction.confidence < .17 && !seen.has(prediction.class)) {
+                flag = true
+                seen.add(prediction.class)
+                setTimeout(() => {seen.clear()}, 5000);
+            }
+                
+        }
 
-        // filter out anything too high confidence--needs to be very tight for sparse detections
-        predictions = predictions.filter(prediction => prediction.confidence < .103)
-
-        predictions.forEach(function(prediction) {
-            const x = prediction.bbox.x + xRand;
-            const y = prediction.bbox.y + yRand;
-
+        if(flag && prediction) {
+            const x = (prediction.bbox.x < 300 ? prediction.bbox.x : prediction.bbox.x + xRand)
+            const y = (prediction.bbox.y < 300 ? prediction.bbox.y : prediction.bbox.y + yRand)
+    
             const width = prediction.bbox.width;
             const height = prediction.bbox.height;
-
+    
             // Draw the bounding box.
             ctx.strokeStyle = prediction.color;
             ctx.lineWidth = 4;
             ctx.strokeRect((x-width/2)/scale, (y-height/2)/scale, width/scale, height/scale);
-
+    
             // Draw the label background.
             ctx.fillStyle = prediction.color;
             const textWidth = ctx.measureText(prediction.class).width;
             const textHeight = parseInt(font, 10); // base 10
             ctx.fillRect((x-width/2)/scale, (y-height/2)/scale, textWidth + 8, textHeight + 4);
-        });
-
-        predictions.forEach(function(prediction) {
-            console.log(prediction.confidence)
-
-            const x = prediction.bbox.x + xRand;
-            const y = prediction.bbox.y + yRand;
-
-            const width = prediction.bbox.width;
-            const height = prediction.bbox.height;
-
+    
             // Draw the text last to ensure it's on top.
             ctx.font = font;
             ctx.textBaseline = "top";
             ctx.fillStyle = "#000000";
             ctx.fillText("ghost", (x-width/2)/scale+4, (y-height/2)/scale+1);
-        });
+
+            counter++
+            document.getElementById("counter_h3").innerHTML = "Spooky Ghost Counter = " + counter;
+        }
     };
 
     var prevTime;
@@ -162,7 +174,7 @@ $(function() {
 
         // reduce minimum detection threshold
         model.configure({
-            threshold: 0.1
+            threshold: 0.15
         });
 
         model.detect(video).then(function(predictions) {
