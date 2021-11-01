@@ -24,7 +24,7 @@ $(function() {
         });
     });
 
-    var publishable_key = "rf_eF616TpNiRbl6MniCL8FOD4rXX32";
+    var publishable_key = "rf_DH6zabhN9DNqv5ZlrFtEkAPy9g42";
     var toLoad = {
         model: "microsoft-coco",
         version: 2 // <<<--- YOUR VERSION THERE
